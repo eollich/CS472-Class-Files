@@ -97,7 +97,7 @@ static void process_requests(int listen_socket) {
 
     // Receive the client request
     ret = recv(data_socket, recv_buffer, sizeof(recv_buffer), 0);
-    if (ret <= 0) {
+    if (ret == -1) {
       perror("recv");
       close(data_socket);
       continue; // Go back and wait for the next request
