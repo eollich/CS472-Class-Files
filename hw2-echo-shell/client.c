@@ -76,6 +76,7 @@ static void init_header(cs472_proto_header_t *header, int req_cmd,
 
   // TODO: Setup other header fields, eg., header->ver, header->dir, DONE?
   // header->atm, header->ay
+
   header->ver = PROTO_VER_1;
   header->dir = DIR_SEND; // DIR_RECV?
   header->atm = TERM_FALL;

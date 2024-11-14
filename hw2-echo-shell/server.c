@@ -100,7 +100,7 @@ static void process_requests(int listen_socket) {
     if (ret == -1) {
       perror("recv");
       close(data_socket);
-      continue; // Go back and wait for the next request
+      continue;
     }
 
     // Setup to process the client request
