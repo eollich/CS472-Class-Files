@@ -59,11 +59,11 @@ int process_request(const char *host, uint16_t port, char *resource) {
   //    accumulate all of the data received and return this value.
   //---------------------------------------------------------------------------------
 
-  // start attempt
   // 1)
   char *request = generate_cc_request(host, port, resource);
+
   // 2
-  int bytes_sent, bytes_recvd;
+  ssize_t bytes_sent, bytes_recvd;
   bytes_sent = send(sock, request, strlen(request), 0);
   if (bytes_sent < 0) {
     perror("send");
@@ -71,10 +71,10 @@ int process_request(const char *host, uint16_t port, char *resource) {
     return -1;
   }
   // 3 AND 4
-  //  Step 3: Receive the response
+  //  3: recv res
   while ((bytes_recvd = recv(sock, recv_buff, BUFF_SZ, 0)) > 0) {
-    // Step 4: Print the received data
-    printf("%.*s", bytes_recvd, recv_buff);
+    // 4: print recv data
+    printf("%.*s", (int)bytes_recvd, recv_buff);
     total_bytes += bytes_recvd;
   }
 
@@ -82,8 +82,8 @@ int process_request(const char *host, uint16_t port, char *resource) {
     perror("recv");
   }
 
-  // end attempt
   close(sock);
+  // 5
   return total_bytes;
 }
 

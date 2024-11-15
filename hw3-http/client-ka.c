@@ -157,8 +157,14 @@ int submit_request(int sock, const char *host, uint16_t port, char *resource) {
   //          a. close the socket -- close(sock)
   //          b. return -1 to exit this function
   //--------------------------------------------------------------------------------
+  // int header_len = get_http_header_len(recv_buff, bytes_recvd);
+  // if (header_len < 0) {
+  //   fprintf(stderr, "Failed to retrieve HTTP header length\n");
+  //   close(sock);
+  //   return -1;
+  // }
 
-  // EXTRA CREDIT
+  // START EXTRA CREDIT
 
   int header_len, content_len;
   int res =
@@ -168,16 +174,8 @@ int submit_request(int sock, const char *host, uint16_t port, char *resource) {
     close(sock);
     return -1;
   }
-  // even if content len is 0, total bytes is 1048? or somethig/ why
 
   // END EXTRA CREDIT
-
-  // int header_len = get_http_header_len(recv_buff, bytes_recvd);
-  // if (header_len < 0) {
-  //   fprintf(stderr, "Failed to retrieve HTTP header length\n");
-  //   close(sock);
-  //   return -1;
-  // }
 
   //--------------------------------------------------------------------------------
   // TODO:  Get the conetent len
@@ -198,13 +196,15 @@ int submit_request(int sock, const char *host, uint16_t port, char *resource) {
   // from the server
   //
   // YOUR ANSWER:
-  // These 2 calculations track the amount of body data received and what
-  // remains. initial_data = the body bytes received in the first recv() call by
-  // subtracting the header length from the total bytes received.
-  // bytes_remaining = how much more body data is needed by subtracting
-  // initial_data from the total Content-Length. This ensures the program knows
-  // how much data to continue receiving.
+  // The 2 calculations track the amount of body data received and what
+  // is left over.
+  // initial_data = the body bytes received in the first recv() call by
+  // subtracting the header length from the total bytes received
   //
+  // bytes_remaining = how much more body data is needed by subtracting
+  // initial_data from the total Content-Length.
+  // This calculation makes sure the program knows how much data to continue
+  // receiving.
   //--------------------------------------------------------------------------------
   int initial_data = bytes_recvd - header_len;
   int bytes_remaining = content_len - initial_data;
@@ -219,8 +219,7 @@ int submit_request(int sock, const char *host, uint16_t port, char *resource) {
     // 1. make a recv() call to the server, using recv_buff
     // 2. Get the number of bytes received and store in the bytes_recvd variable
     // 3. Check for an error, e.g., bytes_recvd < 0 - if that is the case:
-    //      a. close the socket (sock)
-    //      b. return -1 to indicate an error
+    //    close the socket (sock) and return -1 to indicate an error
     //-----------------------------------------------------------------------------
     bytes_recvd = recv(sock, recv_buff, sizeof(recv_buff), 0);
     if (bytes_recvd < 0) {
@@ -252,7 +251,7 @@ int submit_request(int sock, const char *host, uint16_t port, char *resource) {
   //
   // YOUR ANSWER:
   // This function returns the active socket so that it can be reused for
-  // future requests. Reusing the socket is desireable because it reduces the
+  // future requests. Reusing the socket is important because it reduces the
   // overhead of creating a new connection for each request
   //--------------------------------------------------------------------------------
   return sock;

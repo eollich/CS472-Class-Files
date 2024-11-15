@@ -78,25 +78,26 @@ char *strnstr(const char *s, const char *find, size_t slen) {
  Returns the socket file descriptor on success or an error code on failure
 
 
-------------------------------Variables------------------------------
-hp: Stores the resolved DNS information of the host
-addr: A structure holding the server's address and port information
-sock: Holds the socket file descriptor if successful or an error code if not
+  ------------------------------Variables------------------------------
+  hp: Stores the resolved DNS information of the host
+  addr: A structure holding the server's address and port information
+  sock: Holds the socket file descriptor if successful or an error code if not
 
  ------------------------------Steps------------------------------
  1) Resolves the hostname to an IP address using gethostbyname() (retrieves
     the host's DNS information, the IP address is copied into addr.sin_addr)
  2) Port number is converted to network byte order using htons() and
     assigned to addr.sin_port
- 3) A socket is created with socket() call, specifying PF_INET ( aka IPv4) and
-    SOCK_STREAM ( aka TCP)
+ 3) A socket is created with socket() call, specifying PF_INET (aka IPv4) and
+    SOCK_STREAM (aka TCP)
  4) The connect() function tries to establish a connection to the server
-    using the address and port information
+    using the address and port information. On error returns -1, otherwise
+    returns sock fd
 
  ------------------------------Error Handling------------------------------
-If gethostbyname() fails the error is logged with herror() and returns -2
-If socket() fails error is logged with perror() and -1 is returned
-If connect() fails the socket is closed to release resources and returns -1
+ If gethostbyname() fails the error is logged with herror() and returns -2
+ If socket() fails error is logged with perror() and -1 is returned
+ If connect() fails the socket is closed to release resources and returns -1
 */
 
 int socket_connect(const char *host, uint16_t port) {
@@ -130,24 +131,25 @@ int socket_connect(const char *host, uint16_t port) {
 }
 
 /*
-This function calculates the length of the HTTP header in a buffer
+ This function calculates the length of the HTTP header in a buffer
 
-Returns the header length on success or -1 if the header terminator '\r\n\r\n'
-is not found
+ Returns the header length on success or -1 if the header terminator '\r\n\r\n'
+ is not found
 
------------------------------Variables------------------------------
-end_ptr: NULL or points to the position of the header terminator
-header_len: Stores the calculated length of the header
+ -----------------------------Variables------------------------------
+ end_ptr: NULL or points to the position of the header terminator
+ header_len: Stores the calculated length of the header
 
-------------------------------Steps------------------------------
-1) Searches for the end of the HTTP header '\r\n\r\n' using strnstr()
-   (strnstr scans the buffer for the header terminator)
-   results in end_ptr pointing to the location of the header's end in the buffer
-2) If the terminator is found calcualte the header length as the
-   end_ptr - http_buff + length of the header terminator terminator(which is 4)
-3) If terminator is not found log an error and return -1
-
-
+ ------------------------------Steps------------------------------
+ 1) Searches for the end of the HTTP header (header terminator)
+    '\r\n\r\n' using strnstr()
+    (strnstr scans the buffer for the header terminator start location)
+    will result in end_ptr pointing to the location of the header's end in the
+    buffer due to adding len of HTTP_HEADER_END (4)
+ 2) If the terminator is found calcualte the header length as the end_ptr
+    - http_buff + length of the header terminator terminator(which is 4).
+    This is simply start of header to end of \r\n\r\n
+ 3) If terminator is not found log an error and return -1
 */
 char *end_ptr;
 int get_http_header_len(char *http_buff, int http_buff_len) {
@@ -166,11 +168,8 @@ int get_http_header_len(char *http_buff, int http_buff_len) {
 }
 
 /*
- This function extracts the Content-Length from the HTTP header
-
- Returns the content length if found or `0` if no `Content-Length` header
- exists
-
+ This function gets the Content-Length from the HTTP header
+ Returns the content length if found or 0 if no Content-Length header is found
 
  ------------------------------Variables------------------------------
  next_header_line: Tracks the start of the current header line
@@ -179,11 +178,12 @@ int get_http_header_len(char *http_buff, int http_buff_len) {
 
  ------------------------------Steps------------------------------
  1) Iterates through each line of the HTTP header
-    - Uses sscanf() to copy each header line into header_line
+    Uses sscanf() to copy each header line into header_line (splits lines
+      by finding \r\n)
  2) Searches for the Content-Length header using strcasestr()
-    - If found, locates the colon HTTP_HEADER_DELIM (':') with strchr() to
+    If found, locates the colon HTTP_HEADER_DELIM (':') with strchr() to
       separate the header name and value
-    - Extracts the value part of the header and converts it to an integer
+    Extracts the value part of the header and converts it to an integer
       using atoi()
  3) Returns the content length if found or 0 if the header is not present
 
@@ -222,7 +222,10 @@ void print_header(char *http_buff, int http_header_len) {
   fprintf(stdout, "%.*s\n", http_header_len, http_buff);
 }
 
-// helper
+// finds first occurence of single or double carriage return in a string
+// returns index of start of carriage return if found, if not returns -1
+// if a carriage return is found, it will also set the value of mult ptr to
+// 1 or 2 depending on if it found a single cr or double \r\n vs \r\n\return
 int findCarriageReturn(char *buff, int buff_len, int *mult) {
   for (int i = 0; i < buff_len; i++) {
     if (buff[i] == '\r' && buff[i + 1] == '\n') {
@@ -258,39 +261,36 @@ int process_http_header(char *http_buff, int http_buff_len, int *header_len,
 
   *header_len = -1;
   *content_len = 0;
-  int m;
+  int num_cr;
   int res;
 
   char *cur = http_buff;
-  char cl_buff[MAX_HEADER_LINE] = {0}; // need for memset/bzero?
+  char cl_buff[MAX_HEADER_LINE];
   char *buff_end = http_buff + http_buff_len;
 
   while (cur < buff_end) {
-    res = findCarriageReturn(cur, buff_end - cur, &m);
-    // printf("loop\n");
-    if (m < 1) {
+    res = findCarriageReturn(cur, buff_end - cur, &num_cr);
+    if (num_cr < 1) {
       return -1;
     }
 
-    int line_length = res + (m * 2);
-    // printf("%.*s\n", line_length, cur);
+    int line_length = res + (num_cr * 2);
 
-    if (strncmp(cur, CL_HEADER, sizeof(CL_HEADER) - 1) == 0) {
-      strncpy(cl_buff, cur, line_length - 2);
-      // if {0} doenst work
-      // cl_buff[line_length - 2] = '\0';
-      // printf("found cl header\n");
-      char *header_value_start = strchr(cl_buff, HTTP_HEADER_DELIM);
+    bzero(cl_buff, sizeof(cl_buff));
+    strncpy(cl_buff, cur, line_length - (2 * num_cr));
+    cl_buff[line_length - (num_cr * 2)] = '\0';
+
+    char *isCLHeader = strcasestr(cl_buff, CL_HEADER);
+    if (isCLHeader != NULL) {
+      char *header_value_start = strchr(isCLHeader, HTTP_HEADER_DELIM);
       if (header_value_start != NULL) {
-        char *header_value = header_value_start + 1;
-        *content_len = atoi(header_value);
+        *content_len = atoi(header_value_start + 1);
       }
     }
 
     cur += line_length;
 
-    if (m == 2) {
-      // printf("FOUND END\n");
+    if (num_cr == 2) {
       *header_len = (cur - http_buff);
       break;
     }
@@ -300,27 +300,5 @@ int process_http_header(char *http_buff, int http_buff_len, int *header_len,
     *content_len = 0;
     return -1;
   }
-  // printf("RET 0\n");
-  // printf("HL: %d\n", *header_len);
-  // printf("CL: %d\n", *content_len);
   return 0;
 }
-//
-//   // int h_len, c_len = 0;
-//   // h_len = get_http_header_len(http_buff, http_buff_len);
-//   // if (h_len < 0) {
-//   //   *header_len = 0;
-//   //   *content_len = 0;
-//   //   return -1;
-//   // }
-//   // c_len = get_http_content_len(http_buff, http_buff_len);
-//   // if (c_len < 0) {
-//   //   *header_len = 0;
-//   //   *content_len = 0;
-//   //   return -1;
-//   // }
-//
-//   //*header_len = h_len;
-//   //*content_len = c_len;
-//   // return 0; // success
-// }

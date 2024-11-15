@@ -21,3 +21,8 @@ run-ka:
 .PHONY: run-ka3
 run-ka3:
 	./client-ka httpbin.org 80 / /json /html
+
+.PHONY: clean
+clean:
+	rm -rf client-cc client.ka
+
